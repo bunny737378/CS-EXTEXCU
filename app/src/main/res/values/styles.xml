@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <style name="AppTheme" parent="Theme.Material3.Dark.NoActionBar">
+    <item name="colorPrimaryContainer">@color/labSurface</item>
+    <item name="colorOnPrimaryContainer">@color/labText</item>
+    <item name="colorSecondaryContainer">@color/labSurface</item>
+    <item name="colorOnSecondaryContainer">@color/labText</item>
+    <item name="colorSurfaceVariant">@color/labSurface</item>
+    <item name="colorOnSurfaceVariant">@color/labMuted</item>
+    <item name="colorOutline">#49494F</item>
     <item name="colorSurface">@color/labSurface</item>
     <item name="colorOnSurface">@color/labText</item>
     <item name="colorOnBackground">@color/labText</item>
