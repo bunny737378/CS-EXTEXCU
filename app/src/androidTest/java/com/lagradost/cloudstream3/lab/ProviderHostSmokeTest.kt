@@ -63,8 +63,8 @@ class ProviderHostSmokeTest {
         ActivityScenario.launch(ExtensionLabActivity::class.java).use { scenario ->
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
             scenario.onActivity {
-                APIHolder.apis.add(alpha)
-                APIHolder.apis.add(beta)
+                APIHolder.apis += alpha
+                APIHolder.apis += beta
             }
             try {
                 onView(withText("Select provider")).perform(click())
@@ -115,7 +115,7 @@ class ProviderHostSmokeTest {
                 }
                 assertTrue("Back-to-top should return the response scroll to zero", atTop)
             } finally {
-                scenario.onActivity { APIHolder.apis.remove(alpha); APIHolder.apis.remove(beta) }
+                scenario.onActivity { APIHolder.apis = APIHolder.apis.filter { it !== alpha && it !== beta } }
             }
         }
     }

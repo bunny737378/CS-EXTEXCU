@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
 class ProviderTesterViewModel : ViewModel() {
-    val output = MutableLiveData("Select a downloaded provider and a method. Calls run only when you press Run.")
+    val output = MutableLiveData("")
     val running = MutableLiveData(false)
     private var call: Job? = null
 
