@@ -18,6 +18,16 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.FrameLayout
+import android.widget.ListView
+import android.widget.ImageView
+import android.widget.BaseAdapter
+import android.view.Gravity
+import androidx.core.widget.doAfterTextChanged
+import coil3.load
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -29,7 +39,9 @@ import com.lagradost.cloudstream3.lab.ManualProviderRunner.Method
 class ProviderTesterFragment : Fragment() {
     private val model: ProviderTesterViewModel by viewModels()
     private var providers = emptyList<MainAPI>()
-    private lateinit var provider: Spinner
+    private lateinit var provider: MaterialButton
+    private var selectedProvider: MainAPI? = null
+    private lateinit var controls: Triple<Button, Button, TextView>
     private lateinit var method: Spinner
     private lateinit var value: EditText
     private lateinit var page: EditText
@@ -57,8 +69,8 @@ class ProviderTesterFragment : Fragment() {
             setPadding(0, padding / 2, 0, padding / 2)
             content.addView(this)
         }
-        fun button(label: String, action: () -> Unit) = Button(ctx).apply {
-            text = label; setOnClickListener { action() }; content.addView(this)
+        fun button(label: String, action: () -> Unit) = MaterialButton(ctx).apply {
+            text = label; isAllCaps = false; setOnClickListener { action() }; content.addView(this)
         }
         fun field(hint: String, numeric: Boolean = false) = EditText(ctx).apply {
             this.hint = hint
@@ -68,19 +80,23 @@ class ProviderTesterFragment : Fragment() {
             content.addView(this)
         }
         text("Extension Lab", 26f)
-        text("Manual provider API tester", 20f)
-        text("Install extensions in the Extensions tab, then refresh providers here. This page never plays media or runs automatic tests.")
         status = text("")
         text("Provider")
-        provider = Spinner(ctx).also { content.addView(it) }
-        button("Refresh downloaded providers") { refreshProviders() }
+        provider = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            text = "Select provider"
+            isAllCaps = false
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            setIconResource(android.R.drawable.ic_menu_search)
+            setOnClickListener { showProviderPicker() }
+            content.addView(this, LinearLayout.LayoutParams(-1, -2))
+        }
         text("Method")
         method = Spinner(ctx).also {
             it.adapter = ArrayAdapter(ctx, android.R.layout.simple_spinner_dropdown_item, Method.entries.map { m -> m.title })
             content.addView(it)
         }
         preset = button("Use provider main-page preset") {
-            val api = providers.getOrNull(provider.selectedItemPosition) ?: return@button
+            val api = selectedProvider ?: return@button
             val entries = api.mainPage
             AlertDialog.Builder(ctx).setTitle("Main page request")
                 .setItems(entries.map { it.name.ifBlank { "Default" } }.toTypedArray()) { _, index ->
@@ -98,9 +114,9 @@ class ProviderTesterFragment : Fragment() {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) { updateFields() }
         }
         val run = button("Run selected API call") {
-            val api = providers.getOrNull(provider.selectedItemPosition)
+            val api = selectedProvider
             if (api == null) {
-                Toast.makeText(ctx, "No loaded providers. Download an extension, then refresh.", Toast.LENGTH_LONG).show()
+                Toast.makeText(ctx, "Install a provider from Extensions first.", Toast.LENGTH_LONG).show()
                 return@button
             }
             val selected = Method.entries[method.selectedItemPosition]
@@ -132,20 +148,38 @@ class ProviderTesterFragment : Fragment() {
             setTextIsSelectable(true)
         }
         // Observe after onViewCreated, when viewLifecycleOwner exists.
-        content.tag = Triple(run, cancel, response)
+        controls = Triple(run, cancel, response)
         saved?.let {
             value.setText(it.getString("value", "")); page.setText(it.getString("page", "1"))
             pageName.setText(it.getString("pageName", "")); horizontal.isChecked = it.getBoolean("horizontal")
             casting.isChecked = it.getBoolean("casting"); method.setSelection(it.getInt("method"))
         }
         updateFields()
-        return ScrollView(ctx).apply { addView(content) }
+        val scroll = ScrollView(ctx).apply {
+            isFillViewport = true
+            clipToPadding = false
+            setPadding(0, 0, 0, padding * 5)
+            addView(content)
+        }
+        val top = FloatingActionButton(ctx).apply {
+            setImageResource(com.lagradost.cloudstream3.R.drawable.ic_lab_arrow_up)
+            contentDescription = "Back to top"
+            isVisible = false
+            setOnClickListener { scroll.smoothScrollTo(0, 0) }
+        }
+        scroll.setOnScrollChangeListener { _, _, y, _, _ ->
+            top.isVisible = y > padding * 12
+        }
+        return FrameLayout(ctx).apply {
+            addView(scroll, FrameLayout.LayoutParams(-1, -1))
+            addView(top, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
+                setMargins(padding, padding, padding, padding)
+            })
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        @Suppress("UNCHECKED_CAST")
-        val controls = (view as ScrollView).getChildAt(0).tag as Triple<Button, Button, TextView>
         model.output.observe(viewLifecycleOwner) { result ->
             controls.third.text = if (result.length > 200_000) result.take(200_000) +
                 "\n\n[Display truncated; Copy full response includes the complete result.]" else result
@@ -163,18 +197,90 @@ class ProviderTesterFragment : Fragment() {
     }
 
     private fun refreshProviders() {
-        val selectedName = providers.getOrNull(provider.selectedItemPosition)?.name ?: saved?.getString("provider")
+        val selectedName = selectedProvider?.name ?: saved?.getString("provider")
         providers = APIHolder.apis.toList().sortedWith(compareBy({ it.name }, { it.lang }, { it.mainUrl }))
-        provider.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
-            providers.map { "${it.name} (${it.lang}) — ${it.mainUrl}" }.ifEmpty { listOf("No providers installed") })
-        providers.indexOfFirst { it.name == selectedName }.takeIf { it >= 0 }?.let { provider.setSelection(it) }
+        selectedProvider = providers.firstOrNull { it === selectedProvider }
+            ?: providers.firstOrNull { it.name == selectedName }
+        provider.text = selectedProvider?.name ?: "Select provider"
         val host = activity as? ExtensionLabActivity
         status.text = when {
-            host?.pluginsLoading == true -> "Extensions are loading. Tap Refresh when loading finishes."
-            host?.pluginLoadError != null -> "Some extensions could not load:\n${host.pluginLoadError}"
-            providers.isEmpty() -> "No providers loaded. Download a provider extension in Extensions first."
-            else -> "${providers.size} providers loaded. Select one below."
+            host?.pluginsLoading == true -> "Loading extensions…"
+            host?.pluginLoadError != null -> "Some extensions could not load."
+            providers.isEmpty() -> "Install a provider from Extensions to get started."
+            else -> ""
         }
+        status.isVisible = status.text.isNotBlank()
+    }
+
+    /** Refresh on opening: newly installed providers need no extra refresh button. */
+    private fun showProviderPicker() {
+        refreshProviders()
+        val ctx = requireContext()
+        val dp = resources.displayMetrics.density
+        val padding = (16 * dp).toInt()
+        val search = EditText(ctx).apply {
+            hint = "Search installed providers"
+            inputType = InputType.TYPE_CLASS_TEXT
+            maxLines = 1
+            setSingleLine(true)
+            contentDescription = hint
+        }
+        val list = ListView(ctx).apply { divider = null }
+        val empty = TextView(ctx).apply {
+            text = "No providers found"
+            gravity = Gravity.CENTER
+            setPadding(padding, padding * 2, padding, padding * 2)
+        }
+        var visibleProviders = providers
+        val adapter = object : BaseAdapter() {
+            override fun getCount() = visibleProviders.size
+            override fun getItem(position: Int) = visibleProviders[position]
+            override fun getItemId(position: Int) = position.toLong()
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val row = (convertView as? LinearLayout) ?: LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(padding, padding, padding, padding)
+                    addView(ImageView(ctx), LinearLayout.LayoutParams((36 * dp).toInt(), (36 * dp).toInt()))
+                    addView(TextView(ctx).apply {
+                        textSize = 16f
+                        setPadding(padding, 0, 0, 0)
+                    }, LinearLayout.LayoutParams(-1, -2))
+                }
+                val api = getItem(position)
+                (row.getChildAt(0) as ImageView).apply {
+                    contentDescription = null
+                    load(api.mainUrl.trimEnd('/') + "/favicon.ico") {
+                        placeholder(android.R.drawable.ic_menu_gallery)
+                        error(android.R.drawable.ic_menu_gallery)
+                    }
+                }
+                (row.getChildAt(1) as TextView).text = api.name
+                return row
+            }
+        }
+        list.adapter = adapter
+        val body = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, 0, padding, padding)
+            addView(search, LinearLayout.LayoutParams(-1, -2))
+            addView(empty, LinearLayout.LayoutParams(-1, -2))
+            addView(list, LinearLayout.LayoutParams(-1, (320 * dp).toInt()))
+        }
+        list.emptyView = empty
+        val dialog = MaterialAlertDialogBuilder(ctx).setTitle("Select provider")
+            .setView(body).setNegativeButton("Cancel", null).create()
+        list.setOnItemClickListener { _, _, position, _ ->
+            selectedProvider = visibleProviders[position]
+            provider.text = selectedProvider?.name
+            dialog.dismiss()
+        }
+        search.doAfterTextChanged {
+            val query = it?.toString().orEmpty().trim()
+            visibleProviders = providers.filter { api -> api.name.contains(query, ignoreCase = true) }
+            adapter.notifyDataSetChanged()
+        }
+        dialog.show()
     }
 
     private fun updateFields() {
@@ -197,6 +303,6 @@ class ProviderTesterFragment : Fragment() {
         outState.putString("value", value.text.toString()); outState.putString("page", page.text.toString())
         outState.putString("pageName", pageName.text.toString()); outState.putBoolean("horizontal", horizontal.isChecked)
         outState.putBoolean("casting", casting.isChecked); outState.putInt("method", method.selectedItemPosition)
-        outState.putString("provider", providers.getOrNull(provider.selectedItemPosition)?.name)
+        outState.putString("provider", selectedProvider?.name)
     }
 }

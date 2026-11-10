@@ -17,6 +17,7 @@ expected = {
     },
     'ProviderHostSmokeTest': {
         'launchesOnlyTheLabAndExtensionScreens',
+        'providerPickerFiltersByNameAndSelectsOnlyOnTap',
         'loadsCallsAndRemovesAnActualDexProviderExtension',
     },
 }

@@ -1,6 +1,15 @@
 package com.lagradost.cloudstream3.lab
 
 import android.content.Context
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.withHint
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -44,6 +53,69 @@ class ProviderHostSmokeTest {
             scenario.onActivity { activity ->
                 val host = activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
                 assertEquals(R.id.navigation_settings_plugins, host.navController.currentDestination?.id)
+            }
+        }
+    }
+
+    @Test fun providerPickerFiltersByNameAndSelectsOnlyOnTap() {
+        val alpha = CleanupFixtureProvider().apply { name = "Alpha fixture" }
+        val beta = CleanupFixtureProvider().apply { name = "Beta fixture" }
+        ActivityScenario.launch(ExtensionLabActivity::class.java).use { scenario ->
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            scenario.onActivity {
+                APIHolder.apis.add(alpha)
+                APIHolder.apis.add(beta)
+            }
+            try {
+                onView(withText("Select provider")).perform(click())
+                onView(withHint("Search installed providers")).perform(replaceText("bEtA"))
+                onView(withText("Beta fixture")).perform(click())
+                scenario.onActivity { activity ->
+                    fun descendants(view: View): List<View> = listOf(view) +
+                        if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) }
+                        else emptyList()
+                    val views = descendants(activity.findViewById(android.R.id.content))
+                    assertTrue(views.filterIsInstance<TextView>().any { it.text.toString() == "Beta fixture" })
+                    val scroll = views.filterIsInstance<ScrollView>().first()
+                    val response = descendants(scroll).filterIsInstance<TextView>().last()
+                    response.text = "Offline response\n".repeat(500)
+                }
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                scenario.onActivity { activity ->
+                    fun findScroll(view: View): ScrollView? {
+                        if (view is ScrollView) return view
+                        if (view is ViewGroup) for (i in 0 until view.childCount) {
+                            findScroll(view.getChildAt(i))?.let { return it }
+                        }
+                        return null
+                    }
+                    val scroll = findScroll(activity.findViewById(android.R.id.content))!!
+                    scroll.scrollTo(0, 2000)
+                    val frame = scroll.parent as ViewGroup
+                    val top = frame.getChildAt(1)
+                    assertEquals(View.VISIBLE, top.visibility)
+                    top.performClick()
+                }
+                // Wait for the explicit smooth-scroll animation, then verify its final offset.
+                var atTop = false
+                repeat(30) {
+                    if (!atTop) {
+                        android.os.SystemClock.sleep(50)
+                        scenario.onActivity { activity ->
+                            fun offset(view: View): Int? {
+                                if (view is ScrollView) return view.scrollY
+                                if (view is ViewGroup) for (i in 0 until view.childCount) {
+                                    offset(view.getChildAt(i))?.let { return it }
+                                }
+                                return null
+                            }
+                            atTop = offset(activity.findViewById(android.R.id.content)) == 0
+                        }
+                    }
+                }
+                assertTrue("Back-to-top should return the response scroll to zero", atTop)
+            } finally {
+                scenario.onActivity { APIHolder.apis.remove(alpha); APIHolder.apis.remove(beta) }
             }
         }
     }
