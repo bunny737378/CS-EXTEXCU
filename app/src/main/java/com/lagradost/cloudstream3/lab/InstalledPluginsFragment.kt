@@ -5,6 +5,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ImageView
+import android.view.Gravity
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -65,21 +70,49 @@ class InstalledPluginsFragment : Fragment() {
     private fun refresh() {
         list.removeAllViews()
         fun text(value: String) { list.addView(TextView(requireContext()).apply { text = value; textSize = 16f }) }
-        list.addView(Button(requireContext()).apply {
+        list.addView(MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            isAllCaps = false
             text = "Back to Extensions"
             setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
         })
         text("Installed extensions")
-        list.addView(Button(requireContext()).apply {
+        list.addView(MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            isAllCaps = false
             text = "Import local .cs3 / .zip extension"
             setOnClickListener { importPlugin.launch(arrayOf("*/*")) }
         })
         val installed = (PluginManager.getPluginsOnline() + PluginManager.getPluginsLocal()).distinctBy { it.filePath }
         if (installed.isEmpty()) text("No extensions installed. Add a repository in Extensions or import a local extension.")
         for (plugin in installed.sortedBy { it.internalName }) {
-            text("\n${plugin.internalName}\nVersion ${plugin.version} · ${if (plugin.isOnline) "Repository" else "Local"}")
-            list.addView(Button(requireContext()).apply {
-                text = "Remove ${plugin.internalName}"
+            val dp = resources.displayMetrics.density
+            val card = MaterialCardView(requireContext()).apply {
+                radius = 16 * dp
+                strokeWidth = 0
+                setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(context, com.lagradost.cloudstream3.R.color.labSurface))
+            }
+            val row = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding((16 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt())
+            }
+            row.addView(ImageView(requireContext()).apply {
+                setImageResource(android.R.drawable.ic_menu_manage)
+                imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#9BA0A4"))
+            }, LinearLayout.LayoutParams((32 * dp).toInt(), (32 * dp).toInt()))
+            row.addView(LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((16 * dp).toInt(), 0, (8 * dp).toInt(), 0)
+                addView(TextView(context).apply { text = plugin.internalName; textSize = 16f })
+                addView(TextView(context).apply {
+                    text = "Version ${plugin.version} · ${if (plugin.isOnline) "Repository" else "Local"}"
+                    textSize = 12f
+                    setTextColor(android.graphics.Color.parseColor("#9BA0A4"))
+                })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            isAllCaps = false
+                text = "Remove"
+                contentDescription = "Remove ${plugin.internalName}"
                 setOnClickListener {
                     AlertDialog.Builder(requireContext()).setTitle("Remove extension?")
                         .setMessage(plugin.internalName).setNegativeButton("Cancel", null)
@@ -92,6 +125,8 @@ class InstalledPluginsFragment : Fragment() {
                         }.show()
                 }
             })
+            card.addView(row)
+            list.addView(card, LinearLayout.LayoutParams(-1, -2).apply { topMargin = (12 * dp).toInt() })
         }
     }
 }

@@ -4,6 +4,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 expected = {
+    'ResponseInputsTest': {'searchPreservesOpaqueJsonAndIgnoresPosterHeaders', 'movieAndEpisodesUseOnlyPlaybackData'},
     'ManualProviderRunnerTest': {
         'dispatchesOnlySelectedMethodWithExactInput',
         'forwardsMainPageRequestWithoutReplacingUserData',

@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <color name="colorPrimary">#3d50fa</color>
-  <color name="colorAccent">#3b65f5</color>
-  <color name="primaryGrayBackground">#2B2C30</color>
+  <color name="colorPrimary">#6F55AF</color>
+  <color name="colorAccent">#6F55AF</color>
+  <color name="primaryGrayBackground">#111111</color>
   <color name="adultColor">#FF6F63</color>
+  <color name="labSurface">#1C1C20</color>
+  <color name="labText">#E9EAEE</color>
+  <color name="labMuted">#9BA0A4</color>
 </resources>

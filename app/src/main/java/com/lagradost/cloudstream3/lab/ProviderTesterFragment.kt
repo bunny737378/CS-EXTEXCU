@@ -52,6 +52,8 @@ class ProviderTesterFragment : Fragment() {
     private lateinit var casting: CheckBox
     private lateinit var preset: Button
     private lateinit var status: TextView
+    private lateinit var inputHelp: TextView
+    private lateinit var nextInput: Button
     private var saved: Bundle? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,7 +73,7 @@ class ProviderTesterFragment : Fragment() {
             setPadding(0, padding / 2, 0, padding / 2)
             content.addView(this)
         }
-        fun button(label: String, action: () -> Unit) = MaterialButton(ctx).apply {
+        fun button(label: String, action: () -> Unit) = MaterialButton(ctx, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
             text = label; isAllCaps = false; setOnClickListener { action() }; content.addView(this)
         }
         fun field(hint: String, numeric: Boolean = false) = EditText(ctx).apply {
@@ -106,6 +108,7 @@ class ProviderTesterFragment : Fragment() {
                     pageName.setText(entry.name); value.setText(entry.data); horizontal.isChecked = entry.horizontalImages
                 }.setNegativeButton("Cancel", null).show()
         }
+        inputHelp = text("", 13f)
         value = field("Input")
         page = field("Page (positive integer)", true).apply { setText("1") }
         pageName = field("Main-page request name (may be empty)")
@@ -143,6 +146,20 @@ class ProviderTesterFragment : Fragment() {
                 Toast.makeText(ctx, "Response is too large for the clipboard", Toast.LENGTH_LONG).show()
             }
         }
+        nextInput = button("Use response as next input") {
+            val choices = model.nextInputs.value.orEmpty()
+            if (choices.isEmpty()) return@button
+            MaterialAlertDialogBuilder(ctx).setTitle("Choose next input")
+                .setItems(choices.map { it.label }.toTypedArray()) { _, index ->
+                    val choice = choices[index]
+                    selectedProvider = model.resultProvider
+                    provider.text = selectedProvider?.name ?: "Select provider"
+                    method.setSelection(choice.method.ordinal)
+                    value.setText(choice.value)
+                    (view?.let { it as? FrameLayout }?.getChildAt(0) as? ScrollView)?.smoothScrollTo(0, 0)
+                    Toast.makeText(ctx, "Input filled. Press Run to call the provider.", Toast.LENGTH_SHORT).show()
+                }.setNegativeButton("Cancel", null).show()
+        }.apply { isVisible = false }
         text("Response / error", 20f)
         val response = text("").apply {
             typeface = android.graphics.Typeface.MONOSPACE
@@ -182,6 +199,10 @@ class ProviderTesterFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        model.nextInputs.observe(viewLifecycleOwner) { choices ->
+            nextInput.isVisible = choices.isNotEmpty()
+            nextInput.text = if (choices.firstOrNull()?.method == Method.LOAD) "Use result for load" else "Use data for loadLinks"
+        }
         model.output.observe(viewLifecycleOwner) { result ->
             controls.third.text = if (result.length > 200_000) result.take(200_000) +
                 "\n\n[Display truncated; Copy full response includes the complete result.]" else result
@@ -291,9 +312,16 @@ class ProviderTesterFragment : Fragment() {
         page.isVisible = home || selected == Method.PAGED_SEARCH
         pageName.isVisible = home; horizontal.isVisible = home; preset.isVisible = home
         casting.isVisible = selected == Method.LOAD_LINKS
+        inputHelp.text = when (selected) {
+            Method.LOAD -> "Paste the search result's url value, not the whole result. JSON inside url is valid. posterHeaders only fetch the poster; load has no headers parameter."
+            Method.LOAD_LINKS -> "Paste dataUrl (movie/live) or an episode's data from load. Not the search URL. isCasting is passed separately. Link headers and subtitles are returned in the response."
+            Method.MAIN_PAGE -> "Inputs: page + request.name, request.data, request.horizontalImages. Presets fill the provider's own values."
+            Method.PAGED_SEARCH -> "Inputs: query + page (starts at 1)."
+            Method.SEARCH, Method.QUICK_SEARCH -> "Input: query. This provider method has no headers parameter."
+        }
         value.hint = when (selected) {
             Method.MAIN_PAGE -> "MainPageRequest.data (use a preset or enter exact data)"
-            Method.LOAD -> "Content URL passed to load(url)"
+            Method.LOAD -> "url — exact search result value (URL or JSON string)"
             Method.LOAD_LINKS -> "Exact episode/movie data returned by load (not necessarily a URL)"
             else -> "Search query"
         }

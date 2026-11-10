@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <style name="AppTheme" parent="Theme.Material3.Dark.NoActionBar">
+    <item name="colorSurface">@color/labSurface</item>
+    <item name="colorOnSurface">@color/labText</item>
+    <item name="colorOnBackground">@color/labText</item>
+    <item name="android:textColorPrimary">@color/labText</item>
+    <item name="android:textColorSecondary">@color/labMuted</item>
+    <item name="colorSecondary">@color/colorAccent</item>
+    <item name="colorOnPrimary">@color/labText</item>
+    <item name="colorOnSecondary">@color/labText</item>
     <item name="white">#FFFFFF</item>
     <item name="colorPrimary">@color/colorPrimary</item>
     <item name="colorAccent">@color/colorAccent</item>
