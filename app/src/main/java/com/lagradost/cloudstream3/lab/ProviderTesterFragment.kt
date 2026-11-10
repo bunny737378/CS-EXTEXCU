@@ -25,6 +25,8 @@ import android.widget.BaseAdapter
 import android.view.Gravity
 import androidx.core.widget.doAfterTextChanged
 import coil3.load
+import coil3.request.placeholder
+import coil3.request.error
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
