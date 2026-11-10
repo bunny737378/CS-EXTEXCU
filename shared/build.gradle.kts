@@ -18,7 +18,6 @@ kotlin {
         }
     }
 
-    jvm()
 
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
@@ -45,19 +44,10 @@ kotlin {
             implementation(libs.ktor.client.android)
         }
 
-        appleMain.dependencies {
-            implementation(libs.ktor.client.darwin)
-        }
 
-        jvmMain.dependencies {
-            implementation(libs.ktor.client.java)
-        }
     }
 }
 
-dependencies {
-    androidRuntimeClasspath(libs.compose.ui.tooling)
-}
 
 compose.resources {
     publicResClass = true
